@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>동위각·엇각 스피드 퀴즈</title>
 <style>
-:root{--ink:#172033;--muted:#667085;--line:#d0d5dd;--bg:#f4f7fb;--card:#fff;--blue:#3157d5;--red:#c92a2a;--green:#087f5b}
+:root{--ink:#1d241f;--muted:#667268;--line:#e1dfd5;--bg:#faf7ef;--card:#fff;--blue:#3f8f67;--red:#c64848;--green:#2f7d57}
 *{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
 button,input{font:inherit} button{cursor:pointer}
-.wrap{max-width:760px;margin:auto;padding:18px 16px 36px}.card{background:#fff;border:1px solid #e4e7ec;border-radius:20px;padding:22px;box-shadow:0 8px 30px #10182812;margin:14px 0}
+.wrap{max-width:760px;margin:auto;padding:18px 16px 36px}.card{background:#fff;border:1px solid #e4e7ec;border-radius:20px;padding:22px;box-shadow:0 10px 28px #5c604214;margin:14px 0}
 h1{font-size:clamp(26px,7vw,42px);margin:10px 0 4px}h2{margin:0 0 14px}.sub{color:var(--muted);margin:0 0 18px}
 label{display:block;font-weight:700;margin:12px 0 6px}input{width:100%;padding:14px;border:1px solid var(--line);border-radius:12px;font-size:16px;background:#fff}
-.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.btn{border:0;border-radius:12px;padding:14px 16px;font-weight:800;background:var(--blue);color:#fff}.btn.secondary{background:#eef2ff;color:#2949b8}.btn.danger{background:#fff0f0;color:#b42318;border:1px solid #fecdca}.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.btn{border:0;border-radius:12px;padding:14px 16px;font-weight:800;background:var(--blue);color:#fff}.btn.secondary{background:#edf5ef;color:#2f6d4e}.btn.danger{background:#fff0f0;color:#b42318;border:1px solid #fecdca}.btn:disabled{opacity:.45;cursor:not-allowed}
 .rank{width:100%;border-collapse:collapse}.rank td,.rank th{padding:10px 6px;border-bottom:1px solid #eee;text-align:left}.rank th:nth-child(1),.rank td:nth-child(1){width:44px;text-align:center}.rank th:last-child,.rank td:last-child{text-align:right}
-.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:900}.pill{padding:9px 12px;border-radius:999px;background:#eef2ff}.score{background:#ecfdf3}.timer.danger{background:#fff0f0;color:#b42318}
+.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:900}.pill{padding:9px 12px;border-radius:999px;background:#edf5ef}.score{background:#eef8f1}.timer.danger{background:#fff0f0;color:#b42318}
 .figure{width:100%;height:auto;display:block;margin:8px auto}.question{font-size:clamp(23px,6vw,34px);font-weight:900;text-align:center;margin:10px 0 16px}.answer{max-width:360px;margin:auto}.feedback{text-align:center;min-height:30px;font-weight:900;margin-top:10px}.ok{color:var(--green)}.bad{color:var(--red)}
 .hidden{display:none!important}.center{text-align:center}.small{font-size:13px;color:var(--muted)}.resultScore{font-size:56px;font-weight:1000;margin:8px}.lock{color:#b42318;font-weight:900}
 @media(max-width:520px){.card{padding:16px;border-radius:16px}.row.stack{flex-direction:column}.wrap{padding:10px}.btn{min-height:50px}}
@@ -82,42 +82,15 @@ async function loadRanks(){
 }
 
 const labels=["a","b","c","d","e","f","g","h"];
-// 위치: 위 교점 TL,TR,BR,BL / 아래 교점 TL,TR,BR,BL.
-// 동위각은 같은 위치끼리, 엇각(내각)은 c↔e, d↔f.
+// 위 교점: a 좌상, b 우상, c 우하, d 좌하 / 아래 교점: e 좌상, f 우상, g 우하, h 좌하
+// 모든 문제는 서로 평행한 두 직선과, 두 직선을 모두 가로지르는 한 횡단선만 사용한다.
 const corresponding={a:"e",b:"f",c:"g",d:"h",e:"a",f:"b",g:"c",h:"d"};
-const alternate={c:"e",e:"c",d:"f",f:"d"};
-
-function diagramAll(parallel=true){
- return `<svg class="figure" viewBox="0 0 420 300" role="img" aria-label="두 직선과 한 횡단선">
- <rect width="420" height="300" fill="white"/>
- <g stroke="black" stroke-width="4" stroke-linecap="round">
- <line x1="35" y1="85" x2="385" y2="${parallel?85:70}"/>
- <line x1="35" y1="215" x2="385" y2="${parallel?215:235}"/>
- <line x1="135" y1="20" x2="285" y2="280"/>
- </g>
- ${parallel?`<g stroke="black" stroke-width="2"><path d="M55 78 l10 7 -10 7"/><path d="M55 208 l10 7 -10 7"/></g>`:""}
- <g font-size="22" font-weight="700" fill="black" text-anchor="middle">
- <text x="166" y="67">a</text><text x="215" y="67">b</text><text x="224" y="111">c</text><text x="171" y="111">d</text>
- <text x="238" y="197">e</text><text x="287" y="197">f</text><text x="297" y="241">g</text><text x="244" y="241">h</text>
- </g></svg>`;
-}
-function diagramMeasure(kind,deg){
- // 평행선 + 횡단선. a는 위 교점의 내부 오른쪽(c), 주어진 각은 corresponding(g) 또는 alternate(e).
- const target=kind==="corr"?"g":"e";
- const pos={c:[224,111],e:[238,197],g:[297,241]}[target];
- return `<svg class="figure" viewBox="0 0 420 300" role="img" aria-label="평행한 두 직선과 횡단선">
- <rect width="420" height="300" fill="white"/>
- <g stroke="black" stroke-width="4" stroke-linecap="round"><line x1="35" y1="85" x2="385" y2="85"/><line x1="35" y1="215" x2="385" y2="215"/><line x1="135" y1="20" x2="285" y2="280"/></g>
- <g stroke="black" stroke-width="2"><path d="M55 78 l10 7 -10 7"/><path d="M55 208 l10 7 -10 7"/></g>
- <g font-size="22" font-weight="800" fill="black" text-anchor="middle"><text x="224" y="111">a</text><text x="${pos[0]}" y="${pos[1]}">${deg}°</text></g></svg>`;
-}
-function makeQuestion(){
- const r=Math.random();
- if(r<.32){const a=labels[Math.floor(Math.random()*8)];return{q:`각 ${a}의 동위각은?`,ans:corresponding[a],html:diagramAll(Math.random()<.7),input:"text"}}
- if(r<.60){const pool=["c","d","e","f"],a=pool[Math.floor(Math.random()*pool.length)];return{q:`각 ${a}의 엇각은?`,ans:alternate[a],html:diagramAll(true),input:"text"}}
- const kind=r<.80?"corr":"alt"; const vals=[25,30,35,40,45,50,55,60,65,70,75,80,100,105,110,115,120,125,130,135,140,145,150,155]; const deg=vals[Math.floor(Math.random()*vals.length)];
- return{q:"각 a의 크기는?",ans:String(deg),html:diagramMeasure(kind,deg),input:"number"};
-}
+const alternate={a:"g",b:"h",c:"e",d:"f",e:"c",f:"d",g:"a",h:"b"};
+const anglePos={a:[203,80],b:[258,80],c:[270,132],d:[214,132],e:[278,230],f:[333,230],g:[345,282],h:[289,282]};
+function baseDiagram(){return `<svg class="figure" viewBox="0 0 520 360" role="img" aria-label="평행한 두 직선과 한 횡단선"><rect width="520" height="360" rx="18" fill="white"/><g stroke="black" stroke-width="5" stroke-linecap="round"><line x1="45" y1="105" x2="475" y2="105"/><line x1="45" y1="255" x2="475" y2="255"/><line x1="175" y1="20" x2="335" y2="340"/></g><g stroke="black" stroke-width="2.5" fill="none"><path d="M62 96 l12 9 -12 9"/><path d="M82 96 l12 9 -12 9"/><path d="M62 246 l12 9 -12 9"/><path d="M82 246 l12 9 -12 9"/></g></svg>`}
+function diagramAll(){return baseDiagram().replace('</svg>',`<g font-size="27" font-weight="850" fill="black" text-anchor="middle" dominant-baseline="middle"><text x="203" y="80">a</text><text x="258" y="80">b</text><text x="270" y="132">c</text><text x="214" y="132">d</text><text x="278" y="230">e</text><text x="333" y="230">f</text><text x="345" y="282">g</text><text x="289" y="282">h</text></g></svg>`)}
+function diagramMeasure(kind,target,deg){const pair=kind==="corr"?corresponding[target]:alternate[target],t=anglePos[target],p=anglePos[pair];return baseDiagram().replace('</svg>',`<g font-size="27" font-weight="850" fill="black" text-anchor="middle" dominant-baseline="middle"><text x="${t[0]}" y="${t[1]}">${target}</text><text x="${p[0]}" y="${p[1]}">${deg}°</text></g></svg>`)}
+function makeQuestion(){const r=Math.random();if(r<.30){const a=labels[Math.floor(Math.random()*8)];return{q:`각 ${a}의 동위각은?`,ans:corresponding[a],html:diagramAll(),input:"text"}}if(r<.60){const a=labels[Math.floor(Math.random()*8)];return{q:`각 ${a}의 엇각은?`,ans:alternate[a],html:diagramAll(),input:"text"}}const kind=r<.80?"corr":"alt",target=labels[Math.floor(Math.random()*8)],vals=[25,30,35,40,45,50,55,60,65,70,75,80,100,105,110,115,120,125,130,135,140,145,150,155],deg=vals[Math.floor(Math.random()*vals.length)];return{q:`각 ${target}의 크기는?`,ans:String(deg),html:diagramMeasure(kind,target,deg),input:"number"}}
 
 let state={mode:"normal",seconds:300,score:0,correct:0,wrong:0,q:null,locked:false,timer:null,studentNo:"",name:""};
 function begin(mode){
