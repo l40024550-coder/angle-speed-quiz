@@ -1,0 +1,33 @@
+name: simplify-angle-values
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/simplify-angle-values.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove progressive multiple-value condition
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old="function safeValueSlots(relationSlot,count){const groups=[['a','b','c','d'],['a','c','f','h'],['b','d','e','g'],['e','f','g','h']].filter(g=>g.includes(relationSlot));const group=groups[Math.floor(Math.random()*groups.length)];return[relationSlot,...shuffle(group.filter(s=>s!==relationSlot))].slice(0,count)}\nfunction makeSizeQuestion(type,target){const isCorr=type===2,targetSlot=labelToSlot[target],relationSlot=isCorr?baseCorr[targetSlot]:baseAlt[targetSlot],acute=randomAcute(),answer=degreeForSlot(targetSlot,acute),count=Math.min(cycleNo,4);const chosen=safeValueSlots(relationSlot,count),replacements={},used=new Set([answer,180-answer]);replacements[relationSlot]=answer;chosen.slice(1).forEach(s=>replacements[s]=distinctDistractor(used));return{key:`${isCorr?'corrSize':'altSize'}:${cycleNo}:${target}:${acute}:${chosen.slice().sort().join('')}:${Object.values(replacements).join('-')}`,target,ans:String(answer),kind:isCorr?'동위각의 크기':'엇각의 크기',numeric:true,q:`각 ${target}의 크기는?`,html:diagram(replacements),hint:isCorr?'평행선에서 동위각의 크기는 서로 같습니다.':'평행선에서 엇각의 크기는 서로 같습니다.'}}"
+          new="function makeSizeQuestion(type,target){const isCorr=type===2,targetSlot=labelToSlot[target],relationSlot=isCorr?baseCorr[targetSlot]:baseAlt[targetSlot],acute=randomAcute(),answer=degreeForSlot(targetSlot,acute),replacements={};replacements[relationSlot]=answer;return{key:`${isCorr?'corrSize':'altSize'}:${cycleNo}:${target}:${acute}:${relationSlot}`,target,ans:String(answer),kind:isCorr?'동위각의 크기':'엇각의 크기',numeric:true,q:`각 ${target}의 크기는?`,html:diagram(replacements),hint:isCorr?'평행선에서 동위각의 크기는 서로 같습니다.':'평행선에서 엇각의 크기는 서로 같습니다.'}}"
+          if old not in s:
+              raise SystemExit('target block not found')
+          s=s.replace(old,new)
+          s=s.replace("function distinctDistractor(used){let n;do{n=Math.floor(Math.random()*131)+25}while(used.has(n)||used.has(180-n));used.add(n);return n}\n","")
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Show one given angle value per size question"
+          git push
