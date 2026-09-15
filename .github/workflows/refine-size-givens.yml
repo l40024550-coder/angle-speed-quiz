@@ -1,0 +1,31 @@
+name: Refine size question givens
+on:
+  push:
+    paths:
+      - '.github/workflows/refine-size-givens.yml'
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refine size-question given angle placement
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          start=s.index('function makeSizeQuestion(type,target){')
+          end=s.index('\nfunction buildQuestion(type)', start)
+          new=r'''function otherIntersectionSlots(targetSlot){const top=new Set(['a','b','c','d']);const targetTop=top.has(targetSlot);return slots.filter(s=>top.has(s)!==targetTop)}
+function makeSizeQuestion(type,target){const isCorr=type===2,targetSlot=labelToSlot[target],relationSlot=isCorr?baseCorr[targetSlot]:baseAlt[targetSlot],acute=randomAcute(),answer=degreeForSlot(targetSlot,acute),direct=Math.random()<.35;let givenSlot;if(direct){givenSlot=relationSlot}else{const remote=otherIntersectionSlots(targetSlot);const candidates=remote.filter(s=>s!==relationSlot&&degreeForSlot(s,acute)===180-answer);if(!candidates.length)throw new Error('원격 보각 위치 생성 오류');givenSlot=candidates[Math.floor(Math.random()*candidates.length)]}const given=degreeForSlot(givenSlot,acute),replacements={};if(direct&&given!==answer)throw new Error('동위각/엇각 직접 제시 오류');if(!direct){if(given+answer!==180)throw new Error('원격 보각 크기 생성 오류');const sameIntersection=(['a','b','c','d'].includes(targetSlot)===['a','b','c','d'].includes(givenSlot));if(sameIntersection)throw new Error('계산형은 목표각과 같은 교점에 제시할 수 없습니다.');if(givenSlot===relationSlot)throw new Error('계산형은 직접 동위각/엇각 위치에 제시할 수 없습니다.')}if(acuteSlots.has(givenSlot)&&!(given<90)||!acuteSlots.has(givenSlot)&&!(given>90))throw new Error('예각/둔각 표시 오류');replacements[givenSlot]=given;return{key:`${isCorr?'corrSize':'altSize'}:${cycleNo}:${target}:${acute}:${givenSlot}:${direct}`,target,ans:String(answer),kind:isCorr?'동위각의 크기':'엇각의 크기',numeric:true,q:`각 ${target}의 크기는?`,html:diagram(replacements),hint:direct?(isCorr?'평행선에서 동위각의 크기는 서로 같습니다.':'평행선에서 엇각의 크기는 서로 같습니다.'):(isCorr?'먼저 주어진 각과 동위각 관계인 각을 찾은 뒤, 한 직선 위의 두 이웃한 각의 합이 180°임을 이용해 보세요.':'먼저 주어진 각과 엇각 관계를 이용할 수 있는 각을 찾은 뒤, 한 직선 위의 두 이웃한 각의 합이 180°임을 이용해 보세요.')}}'''
+          s=s[:start]+new+s[end:]
+          p.write_text(s)
+      - name: Commit and push
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m 'Require relation-first reasoning in size questions'
+          git push
