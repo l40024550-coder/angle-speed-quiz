@@ -1,0 +1,33 @@
+name: Balanced question cycle
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update question cycle logic
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          start=s.index('let lastQuestionType=null;')
+          end=s.index('let state=', start)
+          new='''let questionTypeQueue=[];
+function shuffledQuestionCycle(){const a=[0,1,2,3];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function nextQuestionType(){if(questionTypeQueue.length===0)questionTypeQueue=shuffledQuestionCycle();return questionTypeQueue.shift()}
+function randomDegreeFor(angleName){const acute=['a','c','e','g'].includes(angleName);const min=acute?25:95,max=acute?85:155;return Math.floor(Math.random()*(max-min+1))+min}
+function makeQuestion(){const target=L[Math.floor(Math.random()*L.length)];const type=nextQuestionType();if(type===0)return{target,ans:corr[target],kind:'동위각',numeric:false,q:`각 ${target}의 동위각은?`,html:diagram(),hint:'평행한 두 직선을 한 직선이 가로지를 때 같은 위치에 있는 두 각을 동위각이라고 합니다.'};if(type===1)return{target,ans:alt[target],kind:'엇각',numeric:false,q:`각 ${target}의 엇각은?`,html:diagram(),hint:'평행한 두 직선을 한 직선이 가로지를 때 두 직선 사이에서 횡단선의 서로 반대쪽에 있는 각을 살펴보세요.'};const isCorr=type===2;const map=isCorr?corr:alt;const given=map[target];const degree=randomDegreeFor(given);return{target,ans:String(degree),kind:isCorr?'동위각의 크기':'엇각의 크기',numeric:true,q:`각 ${target}의 크기는?`,html:diagram(given,degree),hint:isCorr?'평행선에서 동위각의 크기는 서로 같습니다.':'평행선에서 엇각의 크기는 서로 같습니다.'}}
+'''
+          s=s[:start]+new+s[end:]
+          s=s.replace("function begin(mode){lastQuestionType=null;state=", "function begin(mode){questionTypeQueue=[];state=")
+          p.write_text(s)
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m 'Use balanced randomized four-question cycles'
+          git push
