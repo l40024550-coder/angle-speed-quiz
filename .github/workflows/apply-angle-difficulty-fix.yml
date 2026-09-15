@@ -1,0 +1,39 @@
+name: Apply angle difficulty fix
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-angle-difficulty-fix.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch quiz logic
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old="function newLabelMap(){const labels=shuffle(L);slotToLabel={};labelToSlot={};slots.forEach((s,i)=>{slotToLabel[s]=labels[i];labelToSlot[labels[i]]=s})}"
+          new="function newLabelMap(){const labels=cycleNo<=1?[...L]:shuffle(L);slotToLabel={};labelToSlot={};slots.forEach((s,i)=>{slotToLabel[s]=labels[i];labelToSlot[labels[i]]=s})}"
+          assert old in s, 'newLabelMap target not found'
+          s=s.replace(old,new,1)
+          old="function degreeForSlot(slot,acuteDegree){return ['a','c','e','g'].includes(slot)?acuteDegree:180-acuteDegree}\nfunction randomAcute(){return Math.floor(Math.random()*61)+25}"
+          new="const acuteSlots=new Set(['a','c','e','g']);\nfunction degreeForSlot(slot,acuteDegree){const degree=acuteSlots.has(slot)?acuteDegree:180-acuteDegree;if(acuteSlots.has(slot)&&!(degree>0&&degree<90))throw new Error('예각 값 오류');if(!acuteSlots.has(slot)&&!(degree>90&&degree<180))throw new Error('둔각 값 오류');return degree}\nfunction randomAcute(){return Math.floor(Math.random()*51)+30}"
+          assert old in s, 'degree target not found'
+          s=s.replace(old,new,1)
+          old="function makeSizeQuestion(type,target){const isCorr=type===2,targetSlot=labelToSlot[target],relationSlot=isCorr?baseCorr[targetSlot]:baseAlt[targetSlot],acute=randomAcute(),answer=degreeForSlot(targetSlot,acute),replacements={};replacements[relationSlot]=answer;return{"
+          new="function makeSizeQuestion(type,target){const isCorr=type===2,targetSlot=labelToSlot[target],relationSlot=isCorr?baseCorr[targetSlot]:baseAlt[targetSlot],acute=randomAcute(),answer=degreeForSlot(targetSlot,acute),given=degreeForSlot(relationSlot,acute),replacements={};if(given!==answer)throw new Error('동위각/엇각 크기 생성 오류');replacements[relationSlot]=given;return{"
+          assert old in s, 'size question target not found'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Commit patched quiz
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Harden angle difficulty and acute-obtuse validation'
+          git push
