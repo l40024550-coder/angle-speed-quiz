@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>동위각·엇각 스피드 퀴즈</title>
+<style>
+:root{--ink:#172033;--muted:#667085;--line:#d0d5dd;--bg:#f4f7fb;--card:#fff;--blue:#3157d5;--red:#c92a2a;--green:#087f5b}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+button,input{font:inherit} button{cursor:pointer}
+.wrap{max-width:760px;margin:auto;padding:18px 16px 36px}.card{background:#fff;border:1px solid #e4e7ec;border-radius:20px;padding:22px;box-shadow:0 8px 30px #10182812;margin:14px 0}
+h1{font-size:clamp(26px,7vw,42px);margin:10px 0 4px}h2{margin:0 0 14px}.sub{color:var(--muted);margin:0 0 18px}
+label{display:block;font-weight:700;margin:12px 0 6px}input{width:100%;padding:14px;border:1px solid var(--line);border-radius:12px;font-size:16px;background:#fff}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.btn{border:0;border-radius:12px;padding:14px 16px;font-weight:800;background:var(--blue);color:#fff}.btn.secondary{background:#eef2ff;color:#2949b8}.btn.danger{background:#fff0f0;color:#b42318;border:1px solid #fecdca}.btn:disabled{opacity:.45;cursor:not-allowed}
+.rank{width:100%;border-collapse:collapse}.rank td,.rank th{padding:10px 6px;border-bottom:1px solid #eee;text-align:left}.rank th:nth-child(1),.rank td:nth-child(1){width:44px;text-align:center}.rank th:last-child,.rank td:last-child{text-align:right}
+.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:900}.pill{padding:9px 12px;border-radius:999px;background:#eef2ff}.score{background:#ecfdf3}.timer.danger{background:#fff0f0;color:#b42318}
+.figure{width:100%;height:auto;display:block;margin:8px auto}.question{font-size:clamp(23px,6vw,34px);font-weight:900;text-align:center;margin:10px 0 16px}.answer{max-width:360px;margin:auto}.feedback{text-align:center;min-height:30px;font-weight:900;margin-top:10px}.ok{color:var(--green)}.bad{color:var(--red)}
+.hidden{display:none!important}.center{text-align:center}.small{font-size:13px;color:var(--muted)}.resultScore{font-size:56px;font-weight:1000;margin:8px}.lock{color:#b42318;font-weight:900}
+@media(max-width:520px){.card{padding:16px;border-radius:16px}.row.stack{flex-direction:column}.wrap{padding:10px}.btn{min-height:50px}}
+</style>
+</head>
+<body><main class="wrap">
+<section id="home">
+  <h1>동위각·엇각 스피드 퀴즈</h1>
+  <p class="sub">5분 동안 최대한 많이! 정답 +1점 · 오답 -2점 · 오답 후 3초 잠금</p>
+  <div class="card">
+    <h2>참가하기</h2>
+    <label for="studentNo">학번</label><input id="studentNo" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="예: 20301">
+    <label for="studentName">이름</label><input id="studentName" maxlength="20" autocomplete="off" placeholder="이름">
+    <div style="height:14px"></div><button class="btn" id="startBtn">게임 시작</button>
+  </div>
+  <div class="card"><h2>🏆 TOP 5</h2><div id="rankStatus" class="small">랭킹 불러오는 중…</div><table class="rank"><tbody id="rankBody"></tbody></table></div>
+  <button class="btn secondary" id="adminBtn">관리자 화면</button>
+</section>
+
+<section id="admin" class="hidden">
+  <div class="card center"><h2>관리자</h2><p class="sub">테스트는 30초이며 랭킹에 등록되지 않습니다.</p>
+    <div class="row stack"><button class="btn" id="testBtn">테스트 하기</button><button class="btn danger" id="resetBtn">랭킹 초기화하기</button></div>
+    <p id="adminMsg" class="small"></p><button class="btn secondary" id="adminBack">처음으로</button>
+  </div>
+</section>
+
+<section id="game" class="hidden">
+  <div class="topbar"><span id="modePill" class="pill"></span><span id="timer" class="pill timer">05:00</span><span id="score" class="pill score">0점</span></div>
+  <div class="card">
+    <div id="figure"></div><div id="question" class="question"></div>
+    <div class="answer"><input id="answerInput" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="정답 입력">
+      <div style="height:10px"></div><button id="submitBtn" class="btn">정답 확인</button><div id="feedback" class="feedback"></div>
+    </div>
+  </div>
+</section>
+
+<section id="result" class="hidden"><div class="card center"><h2>게임 종료!</h2><div id="resultScore" class="resultScore"></div><p id="resultDetail"></p><p id="saveStatus" class="small"></p><button class="btn" id="homeBtn">처음으로</button></div></section>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBMKRrclbtXrsSRZWSH4jUolMqVg6o8qxI",
+  authDomain: "seoho1angle.firebaseapp.com",
+  projectId: "seoho1angle",
+  storageBucket: "seoho1angle.firebasestorage.app",
+  messagingSenderId: "578868532521",
+  appId: "1:578868532521:web:aadaa38346ed7db8439338"
+};
+const app=initializeApp(firebaseConfig), db=getFirestore(app);
+const SCORES="scores";
+const $=id=>document.getElementById(id);
+const sections=["home","admin","game","result"];
+function show(id){sections.forEach(x=>$(x).classList.toggle("hidden",x!==id))}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+async function loadRanks(){
+  $("rankStatus").textContent="랭킹 불러오는 중…"; $("rankBody").innerHTML="";
+  try{
+    const snap=await getDocs(query(collection(db,SCORES),orderBy("score","desc"),limit(5)));
+    if(snap.empty){$("rankStatus").textContent="아직 등록된 기록이 없습니다.";return}
+    $("rankStatus").textContent="";
+    let n=0; snap.forEach(d=>{const x=d.data(); n++; $("rankBody").insertAdjacentHTML("beforeend",`<tr><td>${n}</td><td>${esc(x.studentNo||"")}</td><td>${esc(x.name||"")}</td><td><b>${Number(x.score)||0}점</b></td></tr>`)});
+  }catch(e){$("rankStatus").textContent="랭킹을 불러오지 못했습니다. Firestore 규칙/연결을 확인하세요.";console.error(e)}
+}
+
+const labels=["a","b","c","d","e","f","g","h"];
+// 위치: 위 교점 TL,TR,BR,BL / 아래 교점 TL,TR,BR,BL.
+// 동위각은 같은 위치끼리, 엇각(내각)은 c↔e, d↔f.
+const corresponding={a:"e",b:"f",c:"g",d:"h",e:"a",f:"b",g:"c",h:"d"};
+const alternate={c:"e",e:"c",d:"f",f:"d"};
+
+function diagramAll(parallel=true){
+ return `<svg class="figure" viewBox="0 0 420 300" role="img" aria-label="두 직선과 한 횡단선">
+ <rect width="420" height="300" fill="white"/>
+ <g stroke="black" stroke-width="4" stroke-linecap="round">
+ <line x1="35" y1="85" x2="385" y2="${parallel?85:70}"/>
+ <line x1="35" y1="215" x2="385" y2="${parallel?215:235}"/>
+ <line x1="135" y1="20" x2="285" y2="280"/>
+ </g>
+ ${parallel?`<g stroke="black" stroke-width="2"><path d="M55 78 l10 7 -10 7"/><path d="M55 208 l10 7 -10 7"/></g>`:""}
+ <g font-size="22" font-weight="700" fill="black" text-anchor="middle">
+ <text x="166" y="67">a</text><text x="215" y="67">b</text><text x="224" y="111">c</text><text x="171" y="111">d</text>
+ <text x="238" y="197">e</text><text x="287" y="197">f</text><text x="297" y="241">g</text><text x="244" y="241">h</text>
+ </g></svg>`;
+}
+function diagramMeasure(kind,deg){
+ // 평행선 + 횡단선. a는 위 교점의 내부 오른쪽(c), 주어진 각은 corresponding(g) 또는 alternate(e).
+ const target=kind==="corr"?"g":"e";
+ const pos={c:[224,111],e:[238,197],g:[297,241]}[target];
+ return `<svg class="figure" viewBox="0 0 420 300" role="img" aria-label="평행한 두 직선과 횡단선">
+ <rect width="420" height="300" fill="white"/>
+ <g stroke="black" stroke-width="4" stroke-linecap="round"><line x1="35" y1="85" x2="385" y2="85"/><line x1="35" y1="215" x2="385" y2="215"/><line x1="135" y1="20" x2="285" y2="280"/></g>
+ <g stroke="black" stroke-width="2"><path d="M55 78 l10 7 -10 7"/><path d="M55 208 l10 7 -10 7"/></g>
+ <g font-size="22" font-weight="800" fill="black" text-anchor="middle"><text x="224" y="111">a</text><text x="${pos[0]}" y="${pos[1]}">${deg}°</text></g></svg>`;
+}
+function makeQuestion(){
+ const r=Math.random();
+ if(r<.32){const a=labels[Math.floor(Math.random()*8)];return{q:`각 ${a}의 동위각은?`,ans:corresponding[a],html:diagramAll(Math.random()<.7),input:"text"}}
+ if(r<.60){const pool=["c","d","e","f"],a=pool[Math.floor(Math.random()*pool.length)];return{q:`각 ${a}의 엇각은?`,ans:alternate[a],html:diagramAll(true),input:"text"}}
+ const kind=r<.80?"corr":"alt"; const vals=[25,30,35,40,45,50,55,60,65,70,75,80,100,105,110,115,120,125,130,135,140,145,150,155]; const deg=vals[Math.floor(Math.random()*vals.length)];
+ return{q:"각 a의 크기는?",ans:String(deg),html:diagramMeasure(kind,deg),input:"number"};
+}
+
+let state={mode:"normal",seconds:300,score:0,correct:0,wrong:0,q:null,locked:false,timer:null,studentNo:"",name:""};
+function begin(mode){
+ state={mode,seconds:mode==="test"?30:300,score:0,correct:0,wrong:0,q:null,locked:false,timer:null,studentNo:$("studentNo").value.trim(),name:$("studentName").value.trim()};
+ show("game"); $("modePill").textContent=mode==="test"?"관리자 테스트":"본 게임"; updateHud(); nextQ();
+ state.timer=setInterval(()=>{state.seconds--;updateHud();if(state.seconds<=0)finish()},1000);
+}
+function updateHud(){const m=Math.floor(state.seconds/60),s=state.seconds%60;$("timer").textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;$("timer").classList.toggle("danger",state.seconds<=30);$("score").textContent=`${state.score}점`}
+function nextQ(){state.q=makeQuestion();$("figure").innerHTML=state.q.html;$("question").textContent=state.q.q;$("answerInput").value="";$("answerInput").inputMode=state.q.input==="number"?"numeric":"text";$("answerInput").placeholder=state.q.input==="number"?"숫자만 입력":"a~h 중 입력";$("feedback").textContent="";$("feedback").className="feedback";$("answerInput").disabled=false;$("submitBtn").disabled=false;setTimeout(()=>$("answerInput").focus(),30)}
+function normalize(v){return String(v).trim().toLowerCase().replace(/[°º도\s]/g,"")}
+function submit(){
+ if(state.locked||state.seconds<=0)return; const v=normalize($("answerInput").value);if(!v)return;
+ if(v===normalize(state.q.ans)){state.score++;state.correct++;updateHud();$("feedback").textContent="정답! +1";$("feedback").className="feedback ok";setTimeout(nextQ,280)}
+ else{state.score-=2;state.wrong++;updateHud();state.locked=true;$("answerInput").disabled=true;$("submitBtn").disabled=true;let left=3;$("feedback").textContent=`오답! -2 · ${left}초 후 다시 입력`;$("feedback").className="feedback bad lock";const t=setInterval(()=>{left--;if(left>0)$("feedback").textContent=`오답! -2 · ${left}초 후 다시 입력`;else{clearInterval(t);state.locked=false;$("answerInput").disabled=false;$("submitBtn").disabled=false;$("answerInput").value="";$("feedback").textContent="같은 문제에 다시 도전하세요.";$("answerInput").focus()}},1000)}
+}
+async function finish(){
+ if(state.timer){clearInterval(state.timer);state.timer=null}state.seconds=0;updateHud();show("result");$("resultScore").textContent=`${state.score}점`;$("resultDetail").textContent=`정답 ${state.correct}개 · 오답 ${state.wrong}회`;
+ if(state.mode==="test"){$("saveStatus").textContent="테스트 기록은 랭킹에 저장되지 않습니다.";return}
+ $("saveStatus").textContent="랭킹에 기록하는 중…";
+ try{await addDoc(collection(db,SCORES),{studentNo:state.studentNo,name:state.name,score:state.score,correct:state.correct,wrong:state.wrong,mode:"normal",createdAt:Date.now()});$("saveStatus").textContent="랭킹에 기록되었습니다."}
+ catch(e){$("saveStatus").textContent="점수 저장에 실패했습니다. 선생님께 알려주세요.";console.error(e)}
+}
+$("startBtn").onclick=()=>{const no=$("studentNo").value.trim(),nm=$("studentName").value.trim();if(!no||!nm){alert("학번과 이름을 모두 입력해 주세요.");return}begin("normal")};
+$("submitBtn").onclick=submit;$("answerInput").addEventListener("keydown",e=>{if(e.key==="Enter")submit()});
+$("adminBtn").onclick=()=>{const p=prompt("관리자 암호를 입력하세요.");if(p==="4550"){show("admin");$("adminMsg").textContent=""}else if(p!==null)alert("암호가 올바르지 않습니다.")};
+$("testBtn").onclick=()=>begin("test");
+$("resetBtn").onclick=()=>{$("adminMsg").innerHTML="<b>현재 버전에서는 안전을 위해 웹페이지에서 DB 삭제 권한을 열지 않았습니다.</b><br>Firestore의 scores 컬렉션에서 기록을 초기화하세요. 아래 안내에 따라 다음 단계에서 관리자 초기화를 안전하게 완성할 수 있습니다."};
+$("adminBack").onclick=()=>{show("home");loadRanks()};$("homeBtn").onclick=()=>{show("home");loadRanks()};
+loadRanks();
+</script></body></html>
